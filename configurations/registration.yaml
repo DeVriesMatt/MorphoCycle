@@ -1,0 +1,12 @@
+Registration:
+    flip_y: False
+    flip_x: False
+    CoRegged_ChName: "CoRegged_reconstructed_QPI_to_mCh_100Pc"
+    dst_xy_shape: [1024, 1376]
+    scipy_affineMtx_2D: [
+                [5.38390383e-01,8.67002121e-03, 6.51836789e+00],
+                [-7.52133515e-03,5.39319635e-01,-5.89865905e+01]
+            ]
+    fluorescent_dir: "/media/mvries/Derek_Jeeters/PCNA_cell_cycle_marker/data_analysis/mCh_100Pc_subBkg/"
+    qpi_dir: "/media/mvries/Derek_Jeeters/PCNA_cell_cycle_marker/data_analysis/reconstructed_QPI/"
+    save_dir: "/media/mvries/Derek_Jeeters/PCNA_cell_cycle_marker/data_analysis/reconstructed_QPI_registered/"
