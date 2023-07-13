@@ -46,7 +46,7 @@ def get_args():
         help="Number of GPUs to use for training",
     )
     parser.add_argument(
-        "--lr", type=float, default=0.00001, help="Learning rate for optimizer"
+        "--lr", type=float, default=0.000001, help="Learning rate for optimizer"
     )
     parser.add_argument(
         "--weight_decay",
@@ -145,7 +145,7 @@ def train(args):
         num_sanity_val_steps=0,
     )
     trainer.fit(model, cell_data)
-    print(f"Finished training model for drug: {args.drug_label}")
+    print(f"Finished training model.")
     trainer.test(model=model, datamodule=cell_data)
 
 if __name__ == "__main__":

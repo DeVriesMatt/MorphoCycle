@@ -3,6 +3,8 @@ import torch
 from torch.utils.data import Dataset
 from pathlib import Path
 import tifffile as tfl
+import torchvision.transforms as T
+
 
 
 class CellCycleData(Dataset):
@@ -42,12 +44,23 @@ class CellCycleData(Dataset):
     def __getitem__(self, idx):
         img_path = self.img_files[idx]
         img = tfl.imread(img_path)
-        img = img.astype(np.float32)
-        img = img / 255.0
-        img = torch.from_numpy(img).type(torch.FloatTensor)
+        # v_min, v_max = img.min(), img.max()
+        # new_min, new_max = 0, 255
+        img = img/(img.max() + 1e-5)
+        transform = T.Compose([T.ToTensor(),
+                               T.RandomHorizontalFlip(p=0.5),
+                               T.RandomVerticalFlip(p=0.5),
+                               T.RandomRotation(degrees=90),
+                               T.RandomPerspective(distortion_scale=0.5, p=0.5),
+                               T.Resize((64, 64))
+                               ])
+
+        img = transform(img)
+        img = img.expand(3, *img.shape[1:]).type(torch.FloatTensor)
         label = torch.tensor(self.labels[idx])
         track_id = self.track_ids[idx]
         slide_id = self.slide_ids[idx]
+
 
         return img, label, track_id, slide_id
 

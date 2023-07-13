@@ -49,13 +49,14 @@ class CellCycleDataModule(pl.LightningDataModule):
         return DataLoader(
             self.train_set,
             batch_size=self.batch_size,
-            sampler=torch.utils.data.WeightedRandomSampler(
-                weights=self.calculate_weights(), num_samples=len(self.train_set)
-            ),
+            # sampler=torch.utils.data.WeightedRandomSampler(
+            #     weights=self.calculate_weights(), num_samples=len(self.train_set)
+            # ),
+            num_workers=24,
         )
 
     def val_dataloader(self):
-        return DataLoader(self.val_set, batch_size=self.batch_size, shuffle=False)
+        return DataLoader(self.valid_set, batch_size=self.batch_size, shuffle=False, num_workers=24)
 
     def test_dataloader(self):
-        return DataLoader(self.val_set, batch_size=self.batch_size, shuffle=False)
+        return DataLoader(self.valid_set, batch_size=self.batch_size, shuffle=False, num_workers=24)

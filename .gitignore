@@ -7,6 +7,9 @@ logs/
 # C extensions
 *.so
 
+logs/
+.ipynb_checkpoints/
+
 # Distribution / packaging
 .Python
 build/

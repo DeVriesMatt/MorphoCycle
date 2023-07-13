@@ -4,23 +4,25 @@ from torch import nn
 import pytorch_lightning as pl
 from torchmetrics import Accuracy, AUROC, F1Score, Precision, Recall, MetricCollection
 import pandas as pd
+from torchvision.models import resnet50, ResNet50_Weights
 
 
-def create_model(model_name='coatnet_rmlp_1_rw2_224.sw_in12k_ft_in1k', pretrained=True, num_classes=8, **kargs):
-    model = timm.create_model(model_name, pretrained=pretrained)
+def create_model(model_name="IMAGENET1K_V2", pretrained=True, num_classes=8, **kargs):
+    # model = timm.create_model(model_name, pretrained=pretrained)
 
     # get model specific transforms (normalization, resize)
-    data_config = timm.data.resolve_model_data_config(model)
-    transforms = timm.data.create_transform(**data_config, is_training=False)
+    # data_config = timm.data.resolve_model_data_config(model)
+    # transforms = timm.data.create_transform(**data_config, is_training=False)
 
-    for param in model.parameters():
-        param.requires_grad = False
+    model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+    # for param in model.parameters():
+    #     param.requires_grad = False
 
-    num_features = model.head.fc.in_features
-    model.head.fc = nn.Linear(num_features, num_classes)
-    model.head.fc.requires_grad = True
+    num_features = model.fc.in_features
+    model.fc = nn.Linear(num_features, num_classes)
+    model.fc.requires_grad = True
 
-    return model, transforms
+    return model
 
 
 class COATNet(pl.LightningModule):
@@ -43,7 +45,7 @@ class COATNet(pl.LightningModule):
         self.lr = 0.00001
         self.criterion = criterion
 
-        self.model, self.transforms = create_model(model_name=model_name,
+        self.model = create_model(model_name=model_name,
                                                    pretrained=pretrained,
                                                    num_classes=num_classes,
                                                    **kwargs)
@@ -102,14 +104,14 @@ class COATNet(pl.LightningModule):
     def calculate_loss(self, inputs, labels):
         logits = self.forward(inputs)
         loss = self.criterion(logits, labels.long())
-        y_prob = torch.softmax(logits, dim=1)[:, 1]
+        y_prob = torch.softmax(logits, dim=1)
         y_hat = torch.argmax(y_prob, dim=1)
         return loss, y_prob, y_hat, logits
 
     def training_step(self, batch, batch_idx):
-        inputs, labels = batch[0].double(), batch[1].double()
-        loss, y_prob, y_hat = self.calculate_loss(inputs, labels)
-        acc = self.acc(y_prob, labels)
+        inputs, labels = batch[0], batch[1].double()
+        loss, y_prob, y_hat, logits = self.calculate_loss(inputs, labels)
+        acc = self.acc(y_hat, labels)
 
         self.log("train_loss", loss, on_step=True, on_epoch=True, logger=True)
         self.log(
@@ -121,10 +123,8 @@ class COATNet(pl.LightningModule):
             prog_bar=True,
         )
 
-        Y_hat_c = int(y_prob > 0.5)
-        Y_c = int(labels.unsqueeze(1))
-        self.data[Y_c]["count"] += 1
-        self.data[Y_c]["correct"] += Y_hat_c == Y_c
+        # self.data[int(labels)]["count"] += 1
+        # self.data[int(labels)]["correct"] += y_hat == labels
 
         dic = {
             "loss": loss,
@@ -133,9 +133,9 @@ class COATNet(pl.LightningModule):
         return dic
 
     def validation_step(self, batch, batch_idx):
-        inputs, labels = batch[0].double(), batch[1].double()
+        inputs, labels = batch[0], batch[1].double()
         loss, y_prob, y_hat, logits = self.calculate_loss(inputs, labels)
-        acc = self.acc(y_prob, labels)
+        acc = self.acc(y_hat, labels)
 
         self.log("val_loss", loss, on_step=True, on_epoch=True, logger=True)
         self.log(
@@ -146,10 +146,9 @@ class COATNet(pl.LightningModule):
             logger=True,
             prog_bar=True,
         )
-
-        y = int(labels)
-        self.data[y]["count"] += 1
-        self.data[y]["correct"] += y_hat == y
+        # ---->acc log
+        # self.data[int(labels)]["count"] += 1
+        # self.data[int(labels)]["correct"] += y_hat == labels
 
         results = {
             "logits": logits,
@@ -162,21 +161,21 @@ class COATNet(pl.LightningModule):
 
     def on_validation_epoch_end(self):
         logits = torch.cat([x["logits"] for x in self.validation_step_outputs], dim=0)
-        probs = torch.cat([x["y_prob"] for x in self.validation_step_outputs], dim=0)
-        max_probs = torch.stack([x["y_hat"] for x in self.validation_step_outputs])
-        target = torch.stack([x["label"] for x in self.validation_step_outputs], dim=0)
+        probs = torch.cat([x["Y_prob"] for x in self.validation_step_outputs], dim=0)
+        max_probs = torch.cat([x["Y_hat"] for x in self.validation_step_outputs], dim=0)
+        target = torch.cat([x["label"] for x in self.validation_step_outputs], dim=0)
 
         # ---->
         self.log(
             "val_loss",
-            self.criterion(logits, target),
+            self.criterion(logits, target.squeeze().long()),
             prog_bar=True,
             on_epoch=True,
             logger=True,
         )
         self.log(
             "auc",
-            self.auc(probs, target.squeeze()),
+            self.auc(probs, target.squeeze().long()),
             prog_bar=True,
             on_epoch=True,
             logger=True,
@@ -187,22 +186,22 @@ class COATNet(pl.LightningModule):
             logger=True,
         )
         # ---->acc log
-        for c in range(self.num_classes):
-            count = self.data[c]["count"]
-            correct = self.data[c]["correct"]
-            if count == 0:
-                acc = None
-            else:
-                acc = float(correct) / count
-            print("class {}: acc {}, correct {}/{}".format(c, acc, correct, count))
-        self.data = [{"count": 0, "correct": 0} for i in range(self.num_classes)]
+        # for c in range(self.num_classes):
+        #     count = self.data[c]["count"]
+        #     correct = self.data[c]["correct"]
+        #     if count == 0:
+        #         acc = None
+        #     else:
+        #         acc = float(correct) / count
+        #     print("class {}: acc {}, correct {}/{}".format(c, acc, correct.item(), count))
+        # self.data = [{"count": 0, "correct": 0} for i in range(self.num_classes)]
 
         self.validation_step_outputs.clear()
 
     def test_step(self, batch, batch_idx):
-        inputs, labels = batch[0].double(), batch[1].double()
+        inputs, labels = batch[0], batch[1].double()
         loss, y_prob, y_hat, logits = self.calculate_loss(inputs, labels)
-        acc = self.acc(y_prob, labels.unsqueeze(1))
+        acc = self.acc(y_hat, labels)
 
         self.log("test_loss", loss, on_step=True, on_epoch=True, logger=True)
         self.log(
@@ -213,9 +212,9 @@ class COATNet(pl.LightningModule):
             logger=True,
             prog_bar=True,
         )
-        y = int(labels)
-        self.data[y]["count"] += 1
-        self.data[y]["correct"] += y_hat == y
+
+        # self.data[int(labels)]["count"] += 1
+        # self.data[int(labels)]["correct"] += y_hat == labels
 
         results = {
             "logits": logits,
@@ -228,12 +227,12 @@ class COATNet(pl.LightningModule):
         return results
 
     def on_test_end(self):
-        probs = torch.cat([x["y_prob"] for x in self.test_step_outputs], dim=0)
-        max_probs = torch.stack([x["y_hat"] for x in self.test_step_outputs])
-        target = torch.stack([x["label"] for x in self.test_step_outputs], dim=0)
+        probs = torch.cat([x["Y_prob"] for x in self.test_step_outputs], dim=0)
+        max_probs = torch.cat([x["Y_hat"] for x in self.test_step_outputs], dim=0)
+        target = torch.cat([x["label"] for x in self.test_step_outputs], dim=0)
 
         # ---->
-        auc = self.auc(probs, target.squeeze())
+        auc = self.auc(probs, target.squeeze().long())
         metrics = self.test_metrics(max_probs.squeeze(), target.squeeze())
         metrics["auc"] = auc
         for keys, values in metrics.items():
@@ -241,16 +240,16 @@ class COATNet(pl.LightningModule):
             metrics[keys] = values.cpu().numpy()
         print()
         # ---->acc log
-        for c in range(self.num_classes):
-            count = self.data[c]["count"]
-            correct = self.data[c]["correct"]
-            print("val count", count)
-            if count == 0:
-                acc = None
-            else:
-                acc = float(correct) / count
-            print("class {}: acc {}, correct {}/{}".format(c, acc, correct, count))
-        self.data = [{"count": 0, "correct": 0} for i in range(self.num_classes)]
+        # for c in range(self.num_classes):
+        #     count = self.data[c]["count"]
+        #     correct = self.data[c]["correct"]
+        #     print("val count", count)
+        #     if count == 0:
+        #         acc = None
+        #     else:
+        #         acc = float(correct) / count
+        #     print("class {}: acc {}, correct {}/{}".format(c, acc, correct.item(), count))
+        # self.data = [{"count": 0, "correct": 0} for i in range(self.num_classes)]
         # ---->
         result = pd.DataFrame([metrics])
         result.to_csv(self.log_path + "/result.csv")
