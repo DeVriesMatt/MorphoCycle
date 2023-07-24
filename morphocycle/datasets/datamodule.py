@@ -4,7 +4,11 @@ from .dataset import CellCycleData
 from torch.utils.data import DataLoader
 import numpy as np
 import torch.utils.data as data
+import torch
 
+def collate_fn(batch):
+    batch = list(filter(lambda x: x is not None, batch))
+    return torch.utils.data.dataloader.default_collate(batch)
 
 class CellCycleDataModule(pl.LightningDataModule):
     def __init__(
@@ -16,7 +20,6 @@ class CellCycleDataModule(pl.LightningDataModule):
         # Set all input args as attributes
         self.__dict__.update(locals())
         self.img_dir = img_dir
-
 
     def setup(self, stage=None):
         train_set = CellCycleData(
@@ -31,7 +34,7 @@ class CellCycleDataModule(pl.LightningDataModule):
         self.train_set, self.valid_set = data.random_split(train_set, [train_set_size, valid_set_size], generator=seed)
 
     def calculate_weights(self):
-        dloader = DataLoader(self.train_set, batch_size=1, shuffle=False)
+        dloader = DataLoader(self.train_set, batch_size=1, shuffle=False, collate_fn=collate_fn)
         labels = []
         for d in dloader:
             labels.append(d[1].item())
@@ -49,6 +52,7 @@ class CellCycleDataModule(pl.LightningDataModule):
         return DataLoader(
             self.train_set,
             batch_size=self.batch_size,
+            collate_fn=collate_fn,
             # sampler=torch.utils.data.WeightedRandomSampler(
             #     weights=self.calculate_weights(), num_samples=len(self.train_set)
             # ),
@@ -56,7 +60,15 @@ class CellCycleDataModule(pl.LightningDataModule):
         )
 
     def val_dataloader(self):
-        return DataLoader(self.valid_set, batch_size=self.batch_size, shuffle=False, num_workers=24)
+        return DataLoader(self.valid_set,
+                          batch_size=self.batch_size,
+                          shuffle=False,
+                          num_workers=24,
+                          collate_fn=collate_fn)
 
     def test_dataloader(self):
-        return DataLoader(self.valid_set, batch_size=self.batch_size, shuffle=False, num_workers=24)
+        return DataLoader(self.valid_set,
+                          batch_size=self.batch_size,
+                          shuffle=False,
+                          num_workers=24,
+                          collate_fn=collate_fn)

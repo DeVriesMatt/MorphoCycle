@@ -6,7 +6,10 @@ from lightning.pytorch.loggers import WandbLogger
 import argparse
 import warnings
 from datasets.datamodule import CellCycleDataModule
-from models.coatnet import COATNet
+from models.coatnet import Classifier
+from lightning.pytorch.callbacks import Callback
+import wandb
+
 
 warnings.filterwarnings("ignore")
 
@@ -17,12 +20,12 @@ def get_args():
     parser.add_argument(
         "--img_dir",
         type=str,
-        default="/media/mvries/Derek_Jeeters"
-                "/PCNA_cell_cycle_marker/data_analysis/CycleData/",
+        default="/media/mvries/Derek_Jeeters/"
+                "PCNA_cell_cycle_marker/data_analysis/CycleData",
         help="Path to directory containing images",
     )
     parser.add_argument(
-        "--batch_size", type=int, default=16, help="Batch size for training"
+        "--batch_size", type=int, default=128, help="Batch size for training"
     )
     parser.add_argument(
         "--max_epochs", type=int, default=250, help="Maximum number of training epochs"
@@ -105,7 +108,7 @@ def train(args):
     # Setting the seed
     pl.seed_everything(42)
     early_stop_callback = EarlyStopping(
-        monitor="val_loss", min_delta=0.00, patience=50, verbose=True, mode="min"
+        monitor="val_loss", min_delta=0.00, patience=100, verbose=True, mode="min"
     )
 
     checkpoint_callback = ModelCheckpoint(monitor="val_loss")
@@ -116,7 +119,7 @@ def train(args):
         batch_size=args.batch_size,
     )
     cell_data.setup()
-    model = COATNet(num_classes=8,
+    model = Classifier(num_classes=4,
                     pretrained=True,
                     )
 
@@ -139,7 +142,9 @@ def train(args):
         accelerator="gpu",
         devices=args.num_gpus,
         max_epochs=args.max_epochs,
-        callbacks=[early_stop_callback, checkpoint_callback, lr_monitor],
+        callbacks=[early_stop_callback, checkpoint_callback, lr_monitor,
+                   # LogPredictionSamplesCallback()
+                   ],
         default_root_dir=args.log_dir,
         logger=logger,
         num_sanity_val_steps=0,

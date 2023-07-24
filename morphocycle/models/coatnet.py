@@ -5,6 +5,8 @@ import pytorch_lightning as pl
 from torchmetrics import Accuracy, AUROC, F1Score, Precision, Recall, MetricCollection
 import pandas as pd
 from torchvision.models import resnet50, ResNet50_Weights
+import torchvision
+import wandb
 
 
 def create_model(model_name="IMAGENET1K_V2", pretrained=True, num_classes=8, **kargs):
@@ -25,7 +27,7 @@ def create_model(model_name="IMAGENET1K_V2", pretrained=True, num_classes=8, **k
     return model
 
 
-class COATNet(pl.LightningModule):
+class Classifier(pl.LightningModule):
     def __init__(
         self,
         criterion=nn.CrossEntropyLoss(),
@@ -39,7 +41,7 @@ class COATNet(pl.LightningModule):
 
         **kwargs,
     ):
-        super(COATNet, self).__init__()
+        super(Classifier, self).__init__()
 
         self.save_hyperparameters(ignore=["criterion"])
         self.lr = 0.00001
@@ -113,6 +115,18 @@ class COATNet(pl.LightningModule):
         loss, y_prob, y_hat, logits = self.calculate_loss(inputs, labels)
         acc = self.acc(y_hat, labels)
 
+        sample_images = inputs[:6]
+        grid = torchvision.utils.make_grid(sample_images)
+        captions = [f'Truth: {y_i} - Prediction: {y_pred}'
+                    for y_i, y_pred in zip(labels[:6], y_hat[:6])]
+        self.logger.experiment.log({"images": wandb.Image(grid.cpu(), caption=captions)})
+
+        class_names = ['G1', 'S', 'G2', 'MorG1']
+        self.logger.experiment.log({"conf_mat" : wandb.plot.confusion_matrix(probs=None,
+                        y_true=labels, preds=y_hat,
+                        class_names=class_names)}
+)
+
         self.log("train_loss", loss, on_step=True, on_epoch=True, logger=True)
         self.log(
             "train_acc",
@@ -122,6 +136,7 @@ class COATNet(pl.LightningModule):
             logger=True,
             prog_bar=True,
         )
+
 
         # self.data[int(labels)]["count"] += 1
         # self.data[int(labels)]["correct"] += y_hat == labels
@@ -149,6 +164,7 @@ class COATNet(pl.LightningModule):
         # ---->acc log
         # self.data[int(labels)]["count"] += 1
         # self.data[int(labels)]["correct"] += y_hat == labels
+
 
         results = {
             "logits": logits,
@@ -214,6 +230,7 @@ class COATNet(pl.LightningModule):
         )
 
         # self.data[int(labels)]["count"] += 1
+
         # self.data[int(labels)]["correct"] += y_hat == labels
 
         results = {
