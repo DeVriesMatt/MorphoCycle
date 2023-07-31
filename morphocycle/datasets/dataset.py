@@ -15,10 +15,12 @@ class CellCycleData(Dataset):
     def __init__(
         self,
         img_dir=None,
+            split="train",
     ):
         # Set all input args as attributes
         self.__dict__.update(locals())
         self.img_dir = Path(img_dir)
+        self.split = split
 
         # Get all the image files
         img_files = list(self.img_dir.glob("**/*/*/*.tif"))
@@ -60,13 +62,18 @@ class CellCycleData(Dataset):
 
         # else:
         #     label=torch.tensor(4)
-            transform = T.Compose([T.ToTensor(),
-                               # T.RandomHorizontalFlip(p=0.5),
-                               # T.RandomVerticalFlip(p=0.5),
-                               # T.RandomRotation(degrees=90),
-                               # T.RandomPerspective(distortion_scale=0.5, p=0.5),
-                               T.Resize((64, 64))
-                               ])
+            if self.split == "train":
+                transform = T.Compose([T.ToTensor(),
+                                   T.RandomHorizontalFlip(p=0.5),
+                                   T.RandomVerticalFlip(p=0.5),
+                                   T.RandomRotation(degrees=90),
+                                   # T.RandomPerspective(distortion_scale=0.5, p=0.5),
+                                   T.Resize((64, 64))
+                                   ])
+            else:
+                transform = T.Compose([T.ToTensor(),
+                                       T.Resize((64, 64))
+                                       ])
 
             img = transform(img)
             img = img.expand(3, *img.shape[1:]).type(torch.FloatTensor)
