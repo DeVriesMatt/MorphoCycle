@@ -97,10 +97,10 @@ class Classifier(pl.LightningModule):
             lr=self.lr,
             weight_decay=1e-4,
         )
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=self.max_epochs, eta_min=self.lr / 50
-        )
-        return [optimizer], [lr_scheduler]
+        # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer, T_max=self.max_epochs, eta_min=self.lr / 50
+        # )
+        return [optimizer]  # , [lr_scheduler]
 
     def calculate_loss(self, inputs, labels):
         logits = self.forward(inputs)
