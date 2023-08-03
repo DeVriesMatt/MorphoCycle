@@ -46,6 +46,16 @@ class CellCycleData(Dataset):
     def __len__(self):
         return len(self.img_files)
 
+    def __return_labels__(self, idx):
+        img_path = self.img_files[idx]
+        img = tfl.imread(img_path)
+
+        if (img == 0).sum() >= (0.5 * img.shape[0] * img.shape[1]):
+            return None
+        else:
+            label = torch.tensor(self.labels[idx])
+            return label
+
     def __getitem__(self, idx):
         img_path = self.img_files[idx]
         img = tfl.imread(img_path)

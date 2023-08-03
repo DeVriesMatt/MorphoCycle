@@ -34,28 +34,25 @@ class CellCycleDataModule(pl.LightningDataModule):
         self.train_set, self.valid_set = data.random_split(train_set, [train_set_size, valid_set_size], generator=seed)
 
     def calculate_weights(self):
-        dloader = DataLoader(self.train_set, batch_size=1, shuffle=False, collate_fn=collate_fn)
         labels = []
-        for d in dloader:
-            labels.append(d[1].item())
-        labels = np.asarray(labels)
-        class_counts = np.bincount(labels)
+        for i in range(len(self.train_set)):
+            labels.append(self.train_set[i].item())
 
-        # Calculate the inverse of each class frequency
-        class_weights = 1.0 / class_counts
+        class_sample_count = np.unique(labels, return_counts=True)[1]
+        weight = 1. / class_sample_count
+        samples_weight = weight[labels]
+        weights = torch.from_numpy(samples_weight)
 
-        # Now, you can create a weight for each instance in the dataset
-        weights = class_weights[labels]
-        return torch.from_numpy(weights)
+        return weights
 
     def train_dataloader(self):
         return DataLoader(
             self.train_set,
             batch_size=self.batch_size,
             collate_fn=collate_fn,
-            # sampler=torch.utils.data.WeightedRandomSampler(
-            #     weights=self.calculate_weights(), num_samples=len(self.train_set)
-            # ),
+            sampler=torch.utils.data.WeightedRandomSampler(
+                weights=self.calculate_weights(), num_samples=len(self.train_set)
+            ),
             num_workers=24,
         )
 
