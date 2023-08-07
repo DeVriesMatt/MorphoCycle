@@ -36,7 +36,7 @@ class CellCycleDataModule(pl.LightningDataModule):
     def calculate_weights(self):
         labels = []
         for i in range(len(self.train_set)):
-            labels.append(self.train_set[i].item())
+            labels.append(self.train_set[i][1].item())
 
         class_sample_count = np.unique(labels, return_counts=True)[1]
         weight = 1. / class_sample_count
