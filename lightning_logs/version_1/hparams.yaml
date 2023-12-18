@@ -1,0 +1,6 @@
+log_dir: ./logs
+max_epochs: 250
+model_name: coatnet_rmlp_1_rw2_224.sw_in12k_ft_in1k
+num_classes: 4
+pretrained: true
+prob_transform: 0.5

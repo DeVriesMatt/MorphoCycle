@@ -37,7 +37,7 @@ class CellCycleData(Dataset):
                            # "S-G2": 30,
                            "G2": 2,
                            # "G2-M": 50,
-                           "MorG1": 3}
+                           "M": 3}
 
         self.labels = [self.label_dict[x] for x in labels]
         self.track_ids = [str(x.parent.parent.name) for x in self.img_files]
@@ -63,6 +63,7 @@ class CellCycleData(Dataset):
         # new_min, new_max = 0, 255
         # img = np.clip(img, 0, None)
         # img = img/(img.max() + 1e-5)
+        # TODO: check if this is the correct way to do this
         if (img == 0).sum()>=(0.5 * img.shape[0] * img.shape[1]):
             return None
         else:
@@ -93,4 +94,3 @@ class CellCycleData(Dataset):
 
 
             return img, label, track_id, slide_id
-

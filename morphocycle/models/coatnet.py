@@ -8,6 +8,7 @@ import torchvision
 import wandb
 
 
+
 def create_model(model_name="IMAGENET1K_V2", pretrained=True, num_classes=8, **kargs):
     # model = timm.create_model(model_name, pretrained=pretrained)
 
@@ -16,9 +17,14 @@ def create_model(model_name="IMAGENET1K_V2", pretrained=True, num_classes=8, **k
     # transforms = timm.data.create_transform(**data_config, is_training=False)
 
     model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
-    # for param in model.parameters():
-    #     param.requires_grad = False
+    # model = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_efficientnet_b4', pretrained=True)
+    for param in model.parameters():
+        param.requires_grad = True
 
+    # num_features = model.classifier.fc.in_features
+    # model.classifier.fc = nn.Linear(num_features, num_classes)
+    # model.classifier.fc.requires_grad = True
+    #
     num_features = model.fc.in_features
     model.fc = nn.Linear(num_features, num_classes)
     model.fc.requires_grad = True
@@ -36,6 +42,7 @@ class Classifier(pl.LightningModule):
         log_dir="./logs",
         model_name='coatnet_rmlp_1_rw2_224.sw_in12k_ft_in1k',
         pretrained=True,
+        learning_rate=0.00001,
 
 
         **kwargs,
@@ -43,7 +50,7 @@ class Classifier(pl.LightningModule):
         super(Classifier, self).__init__()
 
         self.save_hyperparameters(ignore=["criterion"])
-        self.lr = 0.00001
+        self.lr = learning_rate
         self.criterion = criterion
 
         self.model = create_model(model_name=model_name,
@@ -167,14 +174,7 @@ class Classifier(pl.LightningModule):
         # captions = [f'Truth: {y_i} - Prediction: {y_pred}'
         #             for y_i, y_pred in zip(labels[:6], y_hat[:6])]
         # self.logger.experiment.log({"images_val": wandb.Image(grid.cpu(), caption=captions)})
-        #
-        # class_names = ['G1', 'S', 'G2', 'MorG1']
-        # self.logger.experiment.log({"conf_mat_val": wandb.plot.confusion_matrix(
-        #     probs=None,
-        #     y_true=torch.squeeze(labels).detach().cpu().numpy(),
-        #     preds=torch.squeeze(y_hat).detach().cpu().numpy(),
-        #     class_names=class_names)}
-        # )
+
 
         # ---->acc log
         # self.data[int(labels)]["count"] += 1
@@ -187,6 +187,7 @@ class Classifier(pl.LightningModule):
             "Y_hat": y_hat,
             "label": labels,
         }
+        # print(y_hat == labels)
         self.validation_step_outputs.append(results)
         return results
 
@@ -271,6 +272,14 @@ class Classifier(pl.LightningModule):
             print(f"{keys} = {values}")
             metrics[keys] = values.cpu().numpy()
         print()
+
+        class_names = ['G1', 'S', 'G2', 'M']
+        self.logger.experiment.log({"conf_mat_val": wandb.plot.confusion_matrix(
+            probs=None,
+            y_true=torch.squeeze(target).detach().cpu().numpy(),
+            preds=torch.squeeze(max_probs).detach().cpu().numpy(),
+            class_names=class_names)}
+        )
         # ---->acc log
         # for c in range(self.num_classes):
         #     count = self.data[c]["count"]

@@ -22,21 +22,37 @@ class CellCycleDataModule(pl.LightningDataModule):
         self.img_dir = img_dir
 
     def setup(self, stage=None):
-        train_set = CellCycleData(
-            img_dir=self.img_dir,
+        if stage == "train" or stage is None:
+            self.train_set = CellCycleData(
+                img_dir=self.img_dir,
+                )
+            # TODO: trying the new data as the validation
+            self.valid_set = CellCycleData(
+                img_dir="/mnt/nvme0n1/Datasets/PCNA_new/",
+                split="val",
+                )
+        elif stage == "test":
+            self.valid_set = CellCycleData(
+                img_dir="/mnt/nvme0n1/Datasets/PCNA_new/",
+                split="val",
             )
-        # use 20% of training data for validation
-        train_set_size = int(len(train_set) * 0.8)
-        valid_set_size = len(train_set) - train_set_size
+        #     # use 20% of training data for validation
+        #     train_set_size = int(len(train_set) * 0.8)
+        #     valid_set_size = len(train_set) - train_set_size
+        #
+        #     # split the train set into two
+        #     seed = torch.Generator().manual_seed(42)
+        #     self.train_set, self.valid_set = data.random_split(train_set, [train_set_size, valid_set_size], generator=seed)
+        # elif stage == "test":
+        #     self.valid_set = CellCycleData(
+        #         img_dir=self.img_dir,
+        #         )
 
-        # split the train set into two
-        seed = torch.Generator().manual_seed(42)
-        self.train_set, self.valid_set = data.random_split(train_set, [train_set_size, valid_set_size], generator=seed)
 
     def calculate_weights(self):
         labels = []
         for i in range(len(self.train_set)):
-            if self.train_set[i][1] is not None:
+            if self.train_set[i] is not None:
                 labels.append(self.train_set[i][1].item())
 
         class_sample_count = np.unique(labels, return_counts=True)[1]

@@ -20,15 +20,14 @@ def get_args():
     parser.add_argument(
         "--img_dir",
         type=str,
-        default="/media/mvries/Derek_Jeeters/"
-                "PCNA_cell_cycle_marker/data_analysis/CycleData",
+        default="/mnt/nvme0n1/Datasets/PCNA_GT/",
         help="Path to directory containing images",
     )
     parser.add_argument(
         "--batch_size", type=int, default=128, help="Batch size for training"
     )
     parser.add_argument(
-        "--max_epochs", type=int, default=250, help="Maximum number of training epochs"
+        "--max_epochs", type=int, default=1000, help="Maximum number of training epochs"
     )
     parser.add_argument(
         "--num_workers",
@@ -63,13 +62,13 @@ def get_args():
     parser.add_argument(
         "--pretrained_model_path",
         type=str,
-        default="logs/",
+        default="/home/mvries/Documents/GitHub/MorphoCycle/logs/EfficientNet_Morphocycle/3dbugubg/checkpoints/epoch=10-step=352.ckpt",
         help="Path to pretrained model",
     )
     parser.add_argument(
         "--project_name",
         type=str,
-        default="Coatnet_MorphoCycle",
+        default="EfficientNet_Morphocycle",
         help="Name of the project",
     )
     parser.add_argument(
@@ -108,7 +107,7 @@ def train(args):
     # Setting the seed
     pl.seed_everything(42)
     early_stop_callback = EarlyStopping(
-        monitor="val_loss", min_delta=0.00, patience=100, verbose=True, mode="min"
+        monitor="val_loss", min_delta=0.00, patience=50, verbose=True, mode="min"
     )
 
     checkpoint_callback = ModelCheckpoint(monitor="val_loss")
@@ -121,6 +120,7 @@ def train(args):
     cell_data.setup()
     model = Classifier(num_classes=4,
                     pretrained=True,
+                       learning_rate=args.lr,
                     )
 
     if args.logger == "wandb":
@@ -153,6 +153,48 @@ def train(args):
     print(f"Finished training model.")
     trainer.test(model=model, datamodule=cell_data)
 
+def test(args):
+    print(f"Testing {args.model_type} model.")
+    # Setting the seed
+    pl.seed_everything(42)
+    cell_data = CellCycleDataModule(
+        img_dir=args.img_dir,
+        batch_size=args.batch_size,
+    )
+    cell_data.setup(stage="test")
+    model = Classifier(num_classes=4,
+                    pretrained=True,
+                    )
+    model.load_from_checkpoint(args.pretrained_model_path)
+
+    if args.logger == "wandb":
+        logger = WandbLogger(
+            project=args.project_name,
+            log_model=True,
+            save_dir=args.log_dir,
+        )
+
+    elif args.logger == "tensorboard":
+        logger = pl.loggers.TensorBoardLogger(
+            save_dir=args.log_dir,
+        )
+
+    else:
+        raise ValueError(f"Invalid logger {args.logger}")
+
+    trainer = pl.Trainer(
+        accelerator="gpu",
+        devices=args.num_gpus,
+        max_epochs=args.max_epochs,
+        default_root_dir=args.log_dir,
+        logger=logger,
+        num_sanity_val_steps=0,
+    )
+    trainer.test(model=model, datamodule=cell_data)
+
 if __name__ == "__main__":
     args = get_args()
-    train(args)
+    if args.stage == "train":
+        train(args)
+    elif args.stage == "test":
+        test(args)
