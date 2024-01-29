@@ -1,12 +1,13 @@
 import os
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+import lightning as pl
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.loggers import WandbLogger
 import argparse
 import warnings
-from datasets.datamodule import CellCycleDataModule
+from datasets.datamodule import CellCycleDataModule, PhaseToFlourDataModule
 from models.coatnet import Classifier
+from models.morphocycle import MorphoCycle
 from lightning.pytorch.callbacks import Callback
 import wandb
 
@@ -16,13 +17,21 @@ warnings.filterwarnings("ignore")
 
 def get_args():
     parser = argparse.ArgumentParser(
-        description="Train classification model for cell cycle"
+        description="Train image to image generator model for cell cycle"
     )
 
     parser.add_argument(
-        "--img_dir",
+        "--input_dir",
         type=str,
-        default="/mnt/nvme0n1/Datasets/PCNA_GT/",
+        default="/mnt/nvme0n1/Datasets/PCNA/PhaseToFluorNorm16/"
+                "reconstructed_QPI_registered/",
+        help="Path to directory containing images",
+    )
+    parser.add_argument(
+        "--target_dir",
+        type=str,
+        default="/mnt/nvme0n1/Datasets/PCNA/PhaseToFluorNorm16/"
+                "mCh_100Pc_subBkg/",
         help="Path to directory containing images",
     )
     parser.add_argument(
@@ -50,7 +59,7 @@ def get_args():
         help="Number of GPUs to use for training",
     )
     parser.add_argument(
-        "--lr", type=float, default=0.000001, help="Learning rate for optimizer"
+        "--lr", type=float, default=0.0001, help="Learning rate for optimizer"
     )
     parser.add_argument(
         "--weight_decay",
@@ -70,7 +79,7 @@ def get_args():
     parser.add_argument(
         "--project_name",
         type=str,
-        default="EfficientNet_Morphocycle",
+        default="ImageToImage_Morphocycle",
         help="Name of the project",
     )
     parser.add_argument(
@@ -89,8 +98,8 @@ def get_args():
     parser.add_argument(
         "--model_type",
         type=str,
-        choices=["coatnet"],
-        default="COATNet",
+        choices=["ImageToImage"],
+        default="ImageToImage",
         help="Choice of model.",
     )
     parser.add_argument(
@@ -115,15 +124,14 @@ def train(args):
     checkpoint_callback = ModelCheckpoint(monitor="val_loss")
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
-    cell_data = CellCycleDataModule(
-        img_dir=args.img_dir,
-        batch_size=args.batch_size,
+    cell_data = PhaseToFlourDataModule(
+        input_dir=args.input_dir,
+        target_dir=args.target_dir,
+        batch_size=4,
     )
     cell_data.setup()
-    model = Classifier(
-        num_classes=4,
-        pretrained=True,
-        learning_rate=args.lr,
+    model = MorphoCycle(
+        args = args
     )
 
     if args.logger == "wandb":
@@ -153,9 +161,9 @@ def train(args):
         ],
         default_root_dir=args.log_dir,
         logger=logger,
-        num_sanity_val_steps=0,
+        num_sanity_val_steps=2,
     )
-    trainer.fit(model, cell_data)
+    trainer.fit(model, datamodule=cell_data)
     print(f"Finished training model.")
     trainer.test(model=model, datamodule=cell_data)
 

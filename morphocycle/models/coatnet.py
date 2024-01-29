@@ -8,7 +8,6 @@ import torchvision
 import wandb
 
 
-
 def create_model(model_name="IMAGENET1K_V2", pretrained=True, num_classes=8, **kargs):
     # model = timm.create_model(model_name, pretrained=pretrained)
 
@@ -40,11 +39,9 @@ class Classifier(pl.LightningModule):
         prob_transform=0.5,
         max_epochs=250,
         log_dir="./logs",
-        model_name='coatnet_rmlp_1_rw2_224.sw_in12k_ft_in1k',
+        model_name="coatnet_rmlp_1_rw2_224.sw_in12k_ft_in1k",
         pretrained=True,
         learning_rate=0.00001,
-
-
         **kwargs,
     ):
         super(Classifier, self).__init__()
@@ -53,22 +50,32 @@ class Classifier(pl.LightningModule):
         self.lr = learning_rate
         self.criterion = criterion
 
-        self.model = create_model(model_name=model_name,
-                                                   pretrained=pretrained,
-                                                   num_classes=num_classes,
-                                                   **kwargs)
+        self.model = create_model(
+            model_name=model_name,
+            pretrained=pretrained,
+            num_classes=num_classes,
+            **kwargs,
+        )
 
         self.num_classes = num_classes
         self.prob_transform = prob_transform
         self.max_epochs = max_epochs
         if num_classes > 2:
-            self.acc = Accuracy(task="multiclass", average="macro", num_classes=num_classes)
-            self.auc = AUROC(task="multiclass", num_classes=num_classes, average="macro")
-            self.F1 = F1Score(task="multiclass", num_classes=num_classes, average="macro")
+            self.acc = Accuracy(
+                task="multiclass", average="macro", num_classes=num_classes
+            )
+            self.auc = AUROC(
+                task="multiclass", num_classes=num_classes, average="macro"
+            )
+            self.F1 = F1Score(
+                task="multiclass", num_classes=num_classes, average="macro"
+            )
             self.precision_metric = Precision(
                 task="multiclass", num_classes=num_classes, average="macro"
             )
-            self.recall = Recall(task="multiclass", num_classes=num_classes, average="macro")
+            self.recall = Recall(
+                task="multiclass", num_classes=num_classes, average="macro"
+            )
         else:
             self.acc = Accuracy(task="binary", average="macro")
             self.auc = AUROC(task="binary", num_classes=num_classes, average="macro")
@@ -76,8 +83,9 @@ class Classifier(pl.LightningModule):
             self.precision_metric = Precision(
                 task="binary", num_classes=num_classes, average="macro"
             )
-            self.recall = Recall(task="binary", num_classes=num_classes, average="macro")
-
+            self.recall = Recall(
+                task="binary", num_classes=num_classes, average="macro"
+            )
 
         self.data = [{"count": 0, "correct": 0} for i in range(self.num_classes)]
         self.log_path = log_dir
@@ -145,7 +153,6 @@ class Classifier(pl.LightningModule):
             prog_bar=True,
         )
 
-
         # self.data[int(labels)]["count"] += 1
         # self.data[int(labels)]["correct"] += y_hat == labels
 
@@ -175,11 +182,9 @@ class Classifier(pl.LightningModule):
         #             for y_i, y_pred in zip(labels[:6], y_hat[:6])]
         # self.logger.experiment.log({"images_val": wandb.Image(grid.cpu(), caption=captions)})
 
-
         # ---->acc log
         # self.data[int(labels)]["count"] += 1
         # self.data[int(labels)]["correct"] += y_hat == labels
-
 
         results = {
             "logits": logits,
@@ -273,12 +278,16 @@ class Classifier(pl.LightningModule):
             metrics[keys] = values.cpu().numpy()
         print()
 
-        class_names = ['G1', 'S', 'G2', 'M']
-        self.logger.experiment.log({"conf_mat_val": wandb.plot.confusion_matrix(
-            probs=None,
-            y_true=torch.squeeze(target).detach().cpu().numpy(),
-            preds=torch.squeeze(max_probs).detach().cpu().numpy(),
-            class_names=class_names)}
+        class_names = ["G1", "S", "G2", "M"]
+        self.logger.experiment.log(
+            {
+                "conf_mat_val": wandb.plot.confusion_matrix(
+                    probs=None,
+                    y_true=torch.squeeze(target).detach().cpu().numpy(),
+                    preds=torch.squeeze(max_probs).detach().cpu().numpy(),
+                    class_names=class_names,
+                )
+            }
         )
         # ---->acc log
         # for c in range(self.num_classes):

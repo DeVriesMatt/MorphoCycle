@@ -8,11 +8,12 @@ import tifffile as tfl
 from tqdm import tqdm
 
 
-
 def make_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", default="/home/mvries/Documents/GitHub/MorphoCycle/configurations/registration.yaml", type=str
+        "--config",
+        default="/home/mvries/Documents/GitHub/MorphoCycle/configurations/registration.yaml",
+        type=str,
     )
     args = parser.parse_args()
     return args

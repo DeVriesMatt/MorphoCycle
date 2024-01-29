@@ -13,6 +13,8 @@ logs/
 lightning_logs/
 logs/
 .ipynb_checkpoints/
+*.zip
+
 
 # Distribution / packaging
 .Python
