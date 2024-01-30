@@ -15,20 +15,19 @@ class MorphoCycle(pl.LightningModule):
         self.args = args
 
         self.generator = UNet(num_classes=1)
-        self.feature_extractor = timm.create_model('resnet18', in_chans=1, features_only=True)
+        self.discriminator = timm.create_model('resnet18', in_chans=1, pretrained=True)
 
-        for param in self.feature_extractor.parameters():
+        for param in self.discriminator.parameters():
             param.requires_grad = False
 
-        self.classifier = nn.Linear(512, 1)
 
         # # num_features = model.classifier.fc.in_features
         # # model.classifier.fc = nn.Linear(num_features, num_classes)
         # # model.classifier.fc.requires_grad = True
         # #
-        # num_features = self.discriminator.fc.in_features
-        # self.discriminator.fc = nn.Linear(num_features, 1)
-        # self.discriminator.fc.requires_grad = True
+        num_features = self.discriminator.fc.in_features
+        self.discriminator.fc = nn.Linear(num_features, 1)
+        self.discriminator.fc.requires_grad = True
 
         self.l1_loss = nn.L1Loss()
         self.adversarial_loss = nn.BCEWithLogitsLoss()
@@ -44,16 +43,10 @@ class MorphoCycle(pl.LightningModule):
         # Optimizers for generator and discriminator
         opt_gen = torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2))
         opt_disc = torch.optim.Adam(
-            self.classifier.parameters(), lr=lr/10, betas=(b1, b2)
+            self.discriminator.parameters(), lr=lr/10, betas=(b1, b2)
         )
 
         return [opt_gen, opt_disc], []
-
-    def discriminator(self, x):
-        x = self.feature_extractor(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        return x
 
     def forward(self, x):
         # Forward pass through the generator (U-Net)
