@@ -20,9 +20,7 @@ class MorphoCycle(pl.LightningModule):
         for param in self.feature_extractor.parameters():
             param.requires_grad = False
 
-        self.classifier = nn.Sequential(
-            nn.Linear(512, 1),
-        )
+        self.classifier = nn.Linear(512, 1)
 
         # # num_features = model.classifier.fc.in_features
         # # model.classifier.fc = nn.Linear(num_features, num_classes)
