@@ -15,10 +15,14 @@ class MorphoCycle(pl.LightningModule):
         self.args = args
 
         self.generator = UNet(num_classes=1)
-        self.discriminator = timm.create_model('resnet18', pretrained=True, in_chans=1, num_classes=1)
+        self.feature_extractor = timm.create_model('resnet18', in_chans=1, features_only=True)
 
-        for param in self.discriminator.parameters():
-            param.requires_grad = True
+        for param in self.feature_extractor.parameters():
+            param.requires_grad = False
+
+        self.classifier = nn.Sequential(
+            nn.Linear(512, 1),
+        )
 
         # # num_features = model.classifier.fc.in_features
         # # model.classifier.fc = nn.Linear(num_features, num_classes)
@@ -42,10 +46,16 @@ class MorphoCycle(pl.LightningModule):
         # Optimizers for generator and discriminator
         opt_gen = torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2))
         opt_disc = torch.optim.Adam(
-            self.discriminator.parameters(), lr=lr/10, betas=(b1, b2)
+            self.classifier.parameters(), lr=lr/10, betas=(b1, b2)
         )
 
         return [opt_gen, opt_disc], []
+
+    def discriminator(self, x):
+        x = self.feature_extractor(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
 
     def forward(self, x):
         # Forward pass through the generator (U-Net)
