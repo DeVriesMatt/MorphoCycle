@@ -57,13 +57,13 @@ class MorphoCycle(pl.LightningModule):
         optimizer_g, optimizer_d = self.optimizers()
 
         self.toggle_optimizer(optimizer_g)
-        self.generated_imgs = self(input_images)
+        generated_imgs = self(input_images)
 
-        content_loss = self.l1_loss(self.generated_imgs, target_images)
+        content_loss = self.l1_loss(generated_imgs, target_images)
         self.log("content_loss", content_loss, prog_bar=True)
 
         # log sampled images
-        sample_gen_imgs = self.generated_imgs[:1]
+        sample_gen_imgs = generated_imgs[:1]
         grid_gen = make_grid(sample_gen_imgs)
 
 
@@ -85,8 +85,8 @@ class MorphoCycle(pl.LightningModule):
 
         # ground truth result (ie: all fake)
         # put on GPU because we created this tensor inside training_loop
-        valid = torch.ones(self.generated_imgs.size(0), 1)
-        valid = valid.type_as(self.generated_imgs)
+        valid = torch.ones(generated_imgs.size(0), 1)
+        valid = valid.type_as(generated_imgs)
 
         # adversarial loss is binary cross-entropy
         g_loss = self.adversarial_loss(self.discriminator(self(input_images)), valid) + content_loss

@@ -127,7 +127,7 @@ def train(args):
     cell_data = PhaseToFlourDataModule(
         input_dir=args.input_dir,
         target_dir=args.target_dir,
-        batch_size=4,
+        batch_size=args.batch_size,
     )
     cell_data.setup()
     model = MorphoCycle(
@@ -165,7 +165,7 @@ def train(args):
     )
     trainer.fit(model, datamodule=cell_data)
     print(f"Finished training model.")
-    trainer.test(model=model, datamodule=cell_data)
+    # trainer.test(model=model, datamodule=cell_data)
 
 
 def test(args):
