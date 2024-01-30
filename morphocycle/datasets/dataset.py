@@ -110,6 +110,9 @@ class PhaseToFlour(Dataset):
         transform=transforms.Compose(
             [
                 transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                        std=[0.229, 0.224, 0.225]),
+
                 # Add any other transformations you need
             ]
         ),
@@ -148,12 +151,9 @@ class PhaseToFlour(Dataset):
             input_image = self.transform(input_image)
             target_image = self.transform(target_image)
 
-        target_image = target_image.expand(3, *target_image.shape[1:]).type(
-            torch.FloatTensor
-        )
 
         sample = {"input": input_image.type(
             torch.FloatTensor
-        ), "target": target_image}
+        ), "target": target_image.type(torch.FloatTensor)}
 
         return sample

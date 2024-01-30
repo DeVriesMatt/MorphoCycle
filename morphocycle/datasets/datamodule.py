@@ -119,7 +119,9 @@ class PhaseToFlourDataModule(pl.LightningDataModule):
             self.transform = transforms.Compose(
                 [
                     transforms.ToTensor(),
-                    transforms.CenterCrop(500),
+                    transforms.Resize(256),
+                    transforms.Normalize(mean=[0.485],
+                                         std=[0.229]),
                     # Add any other transformations here
                 ]
             )

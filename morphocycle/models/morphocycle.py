@@ -1,10 +1,11 @@
 import lightning as pl
 from models.unet import UNet
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import resnet18, ResNet18_Weights
 import torch
 from torch import nn
 from torchvision.utils import make_grid
 import wandb
+import timm
 
 
 class MorphoCycle(pl.LightningModule):
@@ -13,18 +14,19 @@ class MorphoCycle(pl.LightningModule):
         self.save_hyperparameters()
         self.args = args
 
-        self.generator = UNet(num_classes=3)
-        self.discriminator = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+        self.generator = UNet(num_classes=1)
+        self.discriminator = timm.create_model('resnet18', pretrained=True, in_chans=1, num_classes=1)
+
         for param in self.discriminator.parameters():
             param.requires_grad = True
 
-        # num_features = model.classifier.fc.in_features
-        # model.classifier.fc = nn.Linear(num_features, num_classes)
-        # model.classifier.fc.requires_grad = True
-        #
-        num_features = self.discriminator.fc.in_features
-        self.discriminator.fc = nn.Linear(num_features, 1)
-        self.discriminator.fc.requires_grad = True
+        # # num_features = model.classifier.fc.in_features
+        # # model.classifier.fc = nn.Linear(num_features, num_classes)
+        # # model.classifier.fc.requires_grad = True
+        # #
+        # num_features = self.discriminator.fc.in_features
+        # self.discriminator.fc = nn.Linear(num_features, 1)
+        # self.discriminator.fc.requires_grad = True
 
         self.l1_loss = nn.L1Loss()
         self.adversarial_loss = nn.BCEWithLogitsLoss()
@@ -117,47 +119,6 @@ class MorphoCycle(pl.LightningModule):
         optimizer_d.step()
         optimizer_d.zero_grad()
         self.untoggle_optimizer(optimizer_d)
-
-
-        # # Train generator
-        # if optimizer_idx == 0:
-        #     # Generate images
-        #     generated_images = self(real_images)
-        #
-        #     # Calculate adversarial loss (generator wants to fool discriminator)
-        #     gen_discriminated = self.discriminator(generated_images)
-        #     valid = torch.ones_like(gen_discriminated)
-        #     gen_adv_loss = self.adversarial_loss(gen_discriminated, valid)
-        #
-        #     # Calculate content loss (e.g., L1 loss)
-        #     content_loss = self.l1_loss(generated_images, target_images)
-        #
-        #     # Optional: calculate other losses (perceptual, SSIM, etc.)
-        #
-        #     # Combine losses for generator
-        #     g_loss = gen_adv_loss + content_loss  # Add other losses as needed
-        #     self.log("generator_loss", g_loss, on_step=True, on_epoch=True, logger=True)
-        #     return g_loss
-        #
-        # # Train discriminator
-        # if optimizer_idx == 1:
-        #     # Real loss
-        #     real_discriminated = self.discriminator(target_images)
-        #     valid = torch.ones_like(real_discriminated)
-        #     real_loss = self.adversarial_loss(real_discriminated, valid)
-        #
-        #     # Fake loss
-        #     generated_images = self(real_images).detach()
-        #     fake_discriminated = self.discriminator(generated_images)
-        #     fake = torch.zeros_like(fake_discriminated)
-        #     fake_loss = self.adversarial_loss(fake_discriminated, fake)
-        #
-        #     # Combine losses for discriminator
-        #     d_loss = (real_loss + fake_loss) / 2
-        #     self.log(
-        #         "discriminator_loss", d_loss, on_step=True, on_epoch=True, logger=True
-        #     )
-        #     return d_loss
 
     def validation_step(self, batch, batch_idx):
         input_images, target_images = batch["input"], batch["target"]
