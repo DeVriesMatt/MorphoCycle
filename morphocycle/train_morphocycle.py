@@ -8,6 +8,7 @@ import warnings
 from datasets.datamodule import CellCycleDataModule, PhaseToFlourDataModule
 from models.coatnet import Classifier
 from models.morphocycle import MorphoCycle
+from models.pix2pix import Pix2Pix
 from lightning.pytorch.callbacks import Callback
 import wandb
 
@@ -98,8 +99,8 @@ def get_args():
     parser.add_argument(
         "--model_type",
         type=str,
-        choices=["ImageToImage"],
-        default="ImageToImage",
+        choices=["Pix2Pix", "GAN"],
+        default="Pix2Pix",
         help="Choice of model.",
     )
     parser.add_argument(
@@ -130,13 +131,21 @@ def train(args):
         batch_size=args.batch_size,
     )
     cell_data.setup()
-    model = MorphoCycle(
-        args = args
-    )
+    if args.model_type == "GAN":
+        model = MorphoCycle(
+            args = args
+        )
+    elif args.model_type == "Pix2Pix":
+        model = Pix2Pix(
+            args = args
+        )
+    else:
+        raise ValueError(f"Invalid model type {args.model_type}")
 
     if args.logger == "wandb":
         logger = WandbLogger(
             project=args.project_name,
+            name=args.model_type,
             log_model=True,
             save_dir=args.log_dir,
         )

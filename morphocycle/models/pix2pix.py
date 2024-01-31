@@ -8,17 +8,17 @@ import wandb
 import timm
 
 
-class MorphoCycle(pl.LightningModule):
+class Pix2Pix(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters()
         self.args = args
 
         self.generator = UNet(num_classes=1)
-        self.discriminator = timm.create_model('resnet18', in_chans=1, pretrained=True)
+        self.discriminator = timm.create_model('resnet18', in_chans=2, pretrained=True)
 
         for param in self.discriminator.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
 
 
         # # num_features = model.classifier.fc.in_features
@@ -29,7 +29,7 @@ class MorphoCycle(pl.LightningModule):
         self.discriminator.fc = nn.Linear(num_features, 1)
         self.discriminator.fc.requires_grad = True
 
-        self.mse_loss = nn.MSELoss()
+        self.l1_loss = nn.L1Loss()
         self.adversarial_loss = nn.BCEWithLogitsLoss()
         self.automatic_optimization = False
 
@@ -41,9 +41,9 @@ class MorphoCycle(pl.LightningModule):
         b2 = 0.999
 
         # Optimizers for generator and discriminator
-        opt_gen = torch.optim.Adam(self.generator.parameters(), lr=lr, betas=(b1, b2))
+        opt_gen = torch.optim.Adam(self.generator.parameters(), lr=lr/10, betas=(b1, b2))
         opt_disc = torch.optim.Adam(
-            self.discriminator.parameters(), lr=lr/10, betas=(b1, b2)
+            self.discriminator.parameters(), lr=lr, betas=(b1, b2)
         )
 
         return [opt_gen, opt_disc], []
@@ -57,63 +57,44 @@ class MorphoCycle(pl.LightningModule):
 
         optimizer_g, optimizer_d = self.optimizers()
 
+        # Generator forward pass
         self.toggle_optimizer(optimizer_g)
         generated_imgs = self(input_images)
 
-        content_loss = self.mse_loss(generated_imgs, target_images)
+        content_loss = self.l1_loss(generated_imgs, target_images)
         self.log("content_loss", content_loss, prog_bar=True)
 
-        # log sampled images
-        sample_gen_imgs = generated_imgs[:1]
-        grid_gen = make_grid(sample_gen_imgs)
+        # Concatenate input with real and fake images for the discriminator
+        real_pairs = torch.cat((input_images, target_images), dim=1)
+        fake_pairs = torch.cat((input_images, generated_imgs), dim=1)
 
+        # Add noise to real pairs for discriminator training
+        noise_std = 0.05
+        noise = torch.randn_like(real_pairs) * noise_std
+        noisy_real_pairs = real_pairs + noise
 
-        sample_input_imgs = input_images[:1]
-        grid_input = make_grid(sample_input_imgs)
+        # Generate smooth labels for real and fake
+        smooth_real_labels = torch.FloatTensor(target_images.size(0), 1).uniform_(0.8, 0.9).type_as(target_images)
+        smooth_fake_labels = torch.FloatTensor(target_images.size(0), 1).uniform_(0.0, 0.1).type_as(target_images)
 
-
-        sample_target_imgs = target_images[:1]
-        grid_target = make_grid(sample_target_imgs)
-
-
-        self.logger.experiment.log(
-            {
-                "phase_images": wandb.Image(grid_input.cpu()),
-                "fluorescent_images": wandb.Image(grid_target.cpu()),
-                "generated_fluorescent_images": wandb.Image(grid_gen.cpu()),
-            }
-        )
-
-        # ground truth result (ie: all fake)
-        # put on GPU because we created this tensor inside training_loop
-        valid = torch.ones(generated_imgs.size(0), 1)
-        valid = valid.type_as(generated_imgs)
-
-        # adversarial loss is binary cross-entropy
-        g_loss = self.adversarial_loss(self.discriminator(generated_imgs), valid) + content_loss
+        # Generator's adversarial loss
+        g_loss = self.adversarial_loss(self.discriminator(fake_pairs), smooth_real_labels) + content_loss
         self.log("g_loss", g_loss, prog_bar=True)
         self.manual_backward(g_loss)
         optimizer_g.step()
         optimizer_g.zero_grad()
         self.untoggle_optimizer(optimizer_g)
 
-        # train discriminator
-        # Measure discriminator's ability to classify real from generated samples
+        # Train discriminator
         self.toggle_optimizer(optimizer_d)
 
-        # how well can it label as real?
-        valid = torch.ones(target_images.size(0), 1)
-        valid = valid.type_as(target_images)
+        # Real loss
+        real_loss = self.adversarial_loss(self.discriminator(noisy_real_pairs), smooth_real_labels)
 
-        real_loss = self.adversarial_loss(self.discriminator(target_images), valid)
+        # Fake loss
+        fake_loss = self.adversarial_loss(self.discriminator(fake_pairs.detach()), smooth_fake_labels)
 
-        # how well can it label as fake?
-        fake = torch.zeros(target_images.size(0), 1)
-        fake = fake.type_as(target_images)
-
-        fake_loss = self.adversarial_loss(self.discriminator(generated_imgs.detach()), fake)
-
-        # discriminator loss is the average of these
+        # Discriminator loss is the average of real and fake losses
         d_loss = (real_loss + fake_loss) / 2
         self.log("d_loss", d_loss, prog_bar=True)
         self.manual_backward(d_loss)
@@ -128,7 +109,7 @@ class MorphoCycle(pl.LightningModule):
         generated_images = self(input_images)
 
         # Calculate loss (you can use the same losses as in training or different ones)
-        val_loss = self.mse_loss(generated_images, target_images)  # Example: L1 loss
+        val_loss = self.l1_loss(generated_images, target_images)  # Example: L1 loss
 
         # Log the validation loss
         self.log("val_loss", val_loss)
