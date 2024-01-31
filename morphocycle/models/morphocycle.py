@@ -128,7 +128,7 @@ class MorphoCycle(pl.LightningModule):
         generated_images = self(input_images)
 
         # Calculate loss (you can use the same losses as in training or different ones)
-        val_loss = self.l1_loss(generated_images, target_images)  # Example: L1 loss
+        val_loss = self.mse_loss(generated_images, target_images)  # Example: L1 loss
 
         # Log the validation loss
         self.log("val_loss", val_loss)
