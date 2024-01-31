@@ -60,7 +60,7 @@ class MorphoCycle(pl.LightningModule):
         self.toggle_optimizer(optimizer_g)
         generated_imgs = self(input_images)
 
-        content_loss = self.mse(generated_imgs, target_images)
+        content_loss = self.mse_loss(generated_imgs, target_images)
         self.log("content_loss", content_loss, prog_bar=True)
 
         # log sampled images
